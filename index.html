@@ -1540,8 +1540,10 @@
             <div id="admin-content" style="display: none;">
                 <!-- Books -->
                 <div class="admin-section">
-                    <h3>📚 Add Book</h3>
-                    <div id="book-step-1">
+                    <h3>📚 Books</h3>
+
+                    <!-- Step 1: Create book shell -->
+                    <div id="book-create-form">
                         <div class="form-group">
                             <label>Book Title</label>
                             <input type="text" id="book-title" placeholder="e.g., The Great Gatsby">
@@ -1554,20 +1556,35 @@
                             <label>Cover Image URL</label>
                             <input type="text" id="book-cover" placeholder="https://example.com/cover.jpg">
                         </div>
-                        <div class="form-group">
-                            <label>Number of Chapters</label>
-                            <input type="number" id="book-chapters" min="1" max="100" placeholder="e.g., 5">
-                        </div>
-                        <button class="btn-primary" onclick="setupChapters()">Next: Set Up Chapters →</button>
+                        <button class="btn-primary" onclick="createBookShell()">➕ Create Book</button>
                     </div>
 
-                    <div id="book-step-2" style="display:none;">
-                        <div id="chapters-builder"></div>
-                        <button class="btn-primary" onclick="addBook()" style="margin-top:15px;">✅ Save Book</button>
-                        <button style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:2px solid #D9B99B;background:none;font-family:inherit;font-weight:700;cursor:pointer;" onclick="resetBookForm()">← Start Over</button>
-                    </div>
-
+                    <!-- Book list with inline chapter/page editor -->
                     <div class="item-list" id="book-list-admin"></div>
+                </div>
+
+                <!-- Chapter/Page editor panel (slides in) -->
+                <div id="book-editor-panel" style="display:none;" class="admin-section">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+                        <button onclick="closeBookEditor()" style="background:rgba(0,0,0,0.06);border:none;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">←</button>
+                        <div>
+                            <div id="editor-book-title" style="font-weight:800;font-size:18px;"></div>
+                            <div id="editor-book-stats" style="font-size:12px;color:#888;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Existing chapters list -->
+                    <div id="editor-chapters-list"></div>
+
+                    <!-- Add new chapter -->
+                    <div style="background:white;border-radius:15px;padding:18px;margin-top:16px;">
+                        <div style="font-weight:800;font-size:15px;margin-bottom:12px;">➕ Add New Chapter</div>
+                        <div class="form-group">
+                            <label>Chapter Title</label>
+                            <input type="text" id="new-chapter-title" placeholder="e.g., Chapter 1: The Beginning">
+                        </div>
+                        <button class="btn-primary" onclick="addChapterToBook()">Add Chapter</button>
+                    </div>
                 </div>
 
                 <!-- SAT Words with Folders -->
@@ -2023,23 +2040,29 @@
         function displayAdminBooks(books) {
             const container = document.getElementById('book-list-admin');
             if (books.length === 0) {
-                container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">No books yet</p>';
+                container.innerHTML = '<p style="color:#666;text-align:center;padding:20px;">No books yet. Create one above!</p>';
                 return;
             }
-
-            container.innerHTML = books.map((book) => `
-                <div class="book-admin-entry">
+            container.innerHTML = books.map((book) => {
+                const chCount = (book.chapters || []).length;
+                const pgCount = (book.pages    || []).length;
+                const st = book.t.replace(/'/g, "\\'");
+                const sa = book.a.replace(/'/g, "\\'");
+                return `
+                <div class="book-admin-entry" style="flex-wrap:wrap;gap:10px;">
                     <div class="book-admin-thumb" style="background-image:url('${book.i}')"></div>
                     <div class="item-info">
                         <div class="item-title">${book.t}</div>
-                        <div class="item-detail">by ${book.a} • ${book.pages.length} pages</div>
+                        <div class="item-detail">by ${book.a}</div>
+                        <div class="item-detail" style="margin-top:3px;">${chCount} chapter${chCount!==1?'s':''} &bull; ${pgCount} page${pgCount!==1?'s':''}</div>
                     </div>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn-delete" onclick="editBook('${book.id}', '${book.t.replace(/'/g, "\\'")}', '${book.a.replace(/'/g, "\\'")}', '${book.i}')" style="background: #0078D4;">✏️ Edit</button>
-                        <button class="btn-delete" onclick="deleteBook('${book.id}')">Delete</button>
+                    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                        <button class="btn-delete" style="background:#10b981;" onclick="openBookEditor('${book.id}')">📖 Add Content</button>
+                        <button class="btn-delete" style="background:#0078D4;" onclick="editBook('${book.id}','${st}','${sa}','${book.i}')">✏️ Edit Info</button>
+                        <button class="btn-delete" onclick="deleteBook('${book.id}')">🗑️ Delete</button>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
 
         function displayAdminWords(containerId, words, type) {
@@ -2283,293 +2306,315 @@
             `).join('');
         }
 
-        // ===== BOOK BUILDER =====
-        function setupChapters() {
-            const title = document.getElementById('book-title').value.trim();
-            const author = document.getElementById('book-author').value.trim();
-            const cover = document.getElementById('book-cover').value.trim();
-            const numChapters = parseInt(document.getElementById('book-chapters').value);
-
-            if (!title || !author || !cover || !numChapters || numChapters < 1) {
-                alert('Please fill in all fields');
-                return;
-            }
-
-            const builder = document.getElementById('chapters-builder');
-            builder.innerHTML = '';
-
-            for (let c = 1; c <= numChapters; c++) {
-                builder.innerHTML += `
-                    <div style="background:white;border-radius:15px;padding:20px;margin-bottom:15px;">
-                        <div style="font-weight:800;font-size:16px;margin-bottom:12px;">📖 Chapter ${c}</div>
-                        <div class="form-group">
-                            <label>Chapter Title</label>
-                            <input type="text" id="ch-title-${c}" placeholder="e.g., The Beginning">
-                        </div>
-                        <div class="form-group">
-                            <label>Number of Pages</label>
-                            <input type="number" id="ch-pages-${c}" min="1" max="200" placeholder="e.g., 3" onchange="setupPages(${c})">
-                        </div>
-                        <div id="ch-pages-area-${c}"></div>
-                    </div>
-                `;
-            }
-
-            document.getElementById('book-step-1').style.display = 'none';
-            document.getElementById('book-step-2').style.display = 'block';
-        }
-
-        function setupPages(chapterNum) {
-            const numPages = parseInt(document.getElementById(`ch-pages-${chapterNum}`).value);
-            if (!numPages || numPages < 1) return;
-
-            const area = document.getElementById(`ch-pages-area-${chapterNum}`);
-            area.innerHTML = '';
-
-            for (let p = 1; p <= numPages; p++) {
-                area.innerHTML += `
-                    <div class="form-group">
-                        <label>Page ${p}</label>
-                        <textarea id="ch-${chapterNum}-pg-${p}" placeholder="Type text for page ${p}..." style="min-height:100px;width:100%;padding:12px;border:2px solid rgba(0,0,0,0.1);border-radius:12px;font-family:inherit;font-size:14px;"></textarea>
-                    </div>
-                `;
-            }
-        }
-
-        async function addBook() {
-            const title = document.getElementById('book-title').value.trim();
-            const author = document.getElementById('book-author').value.trim();
-            const cover = document.getElementById('book-cover').value.trim();
-            const numChapters = parseInt(document.getElementById('book-chapters').value);
-
-            if (!title || !author || !cover || !numChapters) {
-                alert('Missing book info');
-                return;
-            }
-
-            const pages = [];
-            const chapters = [];
-
-            for (let c = 1; c <= numChapters; c++) {
-                const chTitle = document.getElementById(`ch-title-${c}`)?.value.trim() || `Chapter ${c}`;
-                const numPages = parseInt(document.getElementById(`ch-pages-${c}`)?.value);
-
-                if (!numPages || numPages < 1) {
-                    alert(`Please set pages for Chapter ${c}`);
-                    return;
-                }
-
-                const chapterStartPage = pages.length;
-
-                for (let p = 1; p <= numPages; p++) {
-                    const pageText = document.getElementById(`ch-${c}-pg-${p}`)?.value.trim();
-                    if (!pageText) {
-                        alert(`Chapter ${c}, Page ${p} is empty!`);
-                        return;
-                    }
-                    pages.push(pageText);
-                }
-
-                chapters.push({
-                    title: chTitle,
-                    startPage: chapterStartPage,
-                    endPage: pages.length - 1
-                });
-            }
-
-            const { db, ref, push, set } = window.firebase;
-            const newBookRef = push(ref(db, 'books'));
-            await set(newBookRef, {
-                t: title,
-                a: author,
-                i: cover,
-                pages: pages,
-                chapters: chapters
-            });
-
-            showSuccess(`"${title}" added to cloud! ☁️`);
-            resetBookForm();
-            loadAdminData();
-        }
-
-        function resetBookForm() {
-            document.getElementById('book-title').value = '';
-            document.getElementById('book-author').value = '';
-            document.getElementById('book-cover').value = '';
-            document.getElementById('book-chapters').value = '';
-            document.getElementById('chapters-builder').innerHTML = '';
-            document.getElementById('book-step-1').style.display = 'block';
-            document.getElementById('book-step-2').style.display = 'none';
-        }
-
-        async function addSATWord() {
-            const word = document.getElementById('sat-word').value.trim();
-            const def = document.getElementById('sat-def').value.trim();
-            const folderId = document.getElementById('sat-folder-select').value;
-
-            if (!word || !def || !folderId) {
-                alert('Please fill in all fields and select a folder');
-                return;
-            }
-
-            const { db, ref, push, set, get } = window.firebase;
-
-            const folderSnap = await get(ref(db, `sat-folders/${folderId}`));
-            const folderName = folderSnap.val()?.name || 'Unknown Folder';
-
-            if (editingWordId && editingWordType === 'sat') {
-                await set(ref(db, `sat-words/${editingWordId}`), {
-                    w: word, d: def, folder: folderId, folderName: folderName
-                });
-                showSuccess(`Word updated in "${folderName}"! ✏️`);
-                cancelEdit('sat');
-            } else {
-                const newWordRef = push(ref(db, 'sat-words'));
-                await set(newWordRef, {
-                    w: word, d: def, folder: folderId, folderName: folderName
-                });
-                showSuccess(`Word added to "${folderName}"! ☁️`);
-            }
-
-            document.getElementById('sat-word').value = '';
-            document.getElementById('sat-def').value = '';
-            loadAdminData();
-        }
-
-        async function addIELTSWord() {
-            const word = document.getElementById('ielts-word').value.trim();
-            const def = document.getElementById('ielts-def').value.trim();
-            const folderId = document.getElementById('ielts-folder-select').value;
-
-            if (!word || !def || !folderId) {
-                alert('Please fill in all fields and select a folder');
-                return;
-            }
-
-            const { db, ref, push, set, get } = window.firebase;
-
-            const folderSnap = await get(ref(db, `ielts-folders/${folderId}`));
-            const folderName = folderSnap.val()?.name || 'Unknown Folder';
-
-            if (editingWordId && editingWordType === 'ielts') {
-                await set(ref(db, `ielts-words/${editingWordId}`), {
-                    w: word, d: def, folder: folderId, folderName: folderName
-                });
-                showSuccess(`Word updated in "${folderName}"! ✏️`);
-                cancelEdit('ielts');
-            } else {
-                const newWordRef = push(ref(db, 'ielts-words'));
-                await set(newWordRef, {
-                    w: word, d: def, folder: folderId, folderName: folderName
-                });
-                showSuccess(`Word added to "${folderName}"! ☁️`);
-            }
-
-            document.getElementById('ielts-word').value = '';
-            document.getElementById('ielts-def').value = '';
-            loadAdminData();
-        }
-
-        async function addPodcast() {
-            const title = document.getElementById('podcast-title').value.trim();
-            const url = document.getElementById('podcast-url').value.trim();
-
-            if (!title || !url) {
-                alert('Please fill in all fields');
-                return;
-            }
-
-            let videoId = '';
-            if (url.includes('youtu.be/')) {
-                videoId = url.split('youtu.be/')[1].split('?')[0];
-            } else if (url.includes('youtube.com/watch?v=')) {
-                videoId = url.split('v=')[1].split('&')[0];
-            }
-
-            const { db, ref, push, set } = window.firebase;
-            const newPodcastRef = push(ref(db, 'podcasts'));
-            await set(newPodcastRef, {
-                t: title,
-                u: url,
-                i: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
-            });
-
-            document.getElementById('podcast-title').value = '';
-            document.getElementById('podcast-url').value = '';
-
-            showSuccess('Podcast added to cloud! ☁️');
-            loadAdminData();
-        }
-
+        // ===== BOOK BUILDER (incremental) =====
         let currentEditingBookId = null;
+        let currentEditorBookId  = null;   // book open in the chapter editor
 
+        // ── Create book shell (no chapters required up front) ──
+        async function createBookShell() {
+            const title  = document.getElementById('book-title').value.trim();
+            const author = document.getElementById('book-author').value.trim();
+            const cover  = document.getElementById('book-cover').value.trim();
+            if (!title || !author || !cover) { alert('Please fill in title, author and cover URL'); return; }
+
+            const { db, ref, push, set } = window.firebase;
+            const newRef = push(ref(db, 'books'));
+            await set(newRef, { t: title, a: author, i: cover, pages: [], chapters: [] });
+
+            document.getElementById('book-title').value  = '';
+            document.getElementById('book-author').value = '';
+            document.getElementById('book-cover').value  = '';
+            showSuccess(`"${title}" created! Now open it to add chapters.`);
+            loadAdminData();
+        }
+
+        // ── Open the chapter/page editor for a book ──
+        function openBookEditor(bookId) {
+            currentEditorBookId = bookId;
+            const book = allBooks.find(b => b.id === bookId);
+            if (!book) return;
+
+            document.getElementById('editor-book-title').textContent = book.t;
+            refreshEditorStats(book);
+            renderEditorChapters(book);
+
+            document.getElementById('book-editor-panel').style.display = 'block';
+            document.getElementById('book-editor-panel').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function closeBookEditor() {
+            currentEditorBookId = null;
+            document.getElementById('book-editor-panel').style.display = 'none';
+            document.getElementById('new-chapter-title').value = '';
+        }
+
+        function refreshEditorStats(book) {
+            const ch = (book.chapters || []).length;
+            const pg = (book.pages    || []).length;
+            document.getElementById('editor-book-stats').textContent =
+                `${ch} chapter${ch !== 1 ? 's' : ''} • ${pg} page${pg !== 1 ? 's' : ''}`;
+        }
+
+        function renderEditorChapters(book) {
+            const container = document.getElementById('editor-chapters-list');
+            const chapters  = book.chapters || [];
+            const pages     = book.pages    || [];
+
+            if (chapters.length === 0) {
+                container.innerHTML = '<p style="color:#aaa;text-align:center;padding:16px 0;">No chapters yet. Add one below.</p>';
+                return;
+            }
+
+            container.innerHTML = chapters.map((ch, ci) => {
+                const pageCount = ch.endPage - ch.startPage + 1;
+                return `
+                <div style="background:white;border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1.5px solid rgba(0,0,0,0.06);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-weight:800;font-size:15px;">${ch.title}</div>
+                            <div style="font-size:12px;color:#888;margin-top:3px;">${pageCount} page${pageCount !== 1 ? 's' : ''} (p.${ch.startPage + 1}–${ch.endPage + 1})</div>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                            <button class="word-btn-sm word-btn-edit" onclick="openAddPageForm(${ci})">+ Add Page</button>
+                            <button class="word-btn-sm word-btn-edit" onclick="openEditChapterTitle(${ci})" style="background:#f0f0ff;color:#4444cc;">✏️ Rename</button>
+                            <button class="word-btn-sm word-btn-del" onclick="deleteChapter(${ci})">🗑️</button>
+                        </div>
+                    </div>
+                    <!-- existing pages -->
+                    <div id="chapter-pages-${ci}" style="margin-top:10px;display:none;">
+                        ${pages.slice(ch.startPage, ch.endPage + 1).map((pg, pi) => `
+                            <div style="background:#fafafa;border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:13px;line-height:1.5;display:flex;gap:8px;align-items:flex-start;">
+                                <span style="color:#bbb;font-weight:700;min-width:24px;">p${ch.startPage + pi + 1}</span>
+                                <div style="flex:1;white-space:pre-wrap;">${pg.substring(0, 120)}${pg.length > 120 ? '…' : ''}</div>
+                                <button class="word-btn-sm word-btn-del" style="flex-shrink:0;" onclick="deletePage(${ch.startPage + pi})">🗑️</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button onclick="toggleChapterPages(${ci})" style="background:none;border:none;color:#aaa;font-size:12px;font-weight:700;cursor:pointer;margin-top:6px;padding:0;">▼ Show pages</button>
+                    <!-- add page form (hidden) -->
+                    <div id="add-page-form-${ci}" style="display:none;margin-top:12px;">
+                        <textarea id="new-page-text-${ci}" placeholder="Type page text here..." style="width:100%;padding:12px;border:2px solid #D9B99B;border-radius:10px;font-family:inherit;font-size:14px;min-height:120px;resize:vertical;"></textarea>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button class="btn-primary" onclick="saveNewPage(${ci})" style="padding:10px 16px;width:auto;">💾 Save Page</button>
+                            <button onclick="closeAddPageForm(${ci})" style="padding:10px 16px;border-radius:10px;border:2px solid #ddd;background:none;font-family:inherit;font-weight:700;cursor:pointer;">Cancel</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleChapterPages(ci) {
+            const div = document.getElementById(`chapter-pages-${ci}`);
+            const btn = div.nextElementSibling;
+            if (div.style.display === 'none') {
+                div.style.display = 'block';
+                btn.textContent = '▲ Hide pages';
+            } else {
+                div.style.display = 'none';
+                btn.textContent = '▼ Show pages';
+            }
+        }
+
+        function openAddPageForm(ci) {
+            document.querySelectorAll('[id^="add-page-form-"]').forEach(el => el.style.display = 'none');
+            document.getElementById(`add-page-form-${ci}`).style.display = 'block';
+            document.getElementById(`new-page-text-${ci}`).focus();
+        }
+
+        function closeAddPageForm(ci) {
+            document.getElementById(`add-page-form-${ci}`).style.display = 'none';
+            document.getElementById(`new-page-text-${ci}`).value = '';
+        }
+
+        async function saveNewPage(ci) {
+            const { db, ref, get, set } = window.firebase;
+            const text = document.getElementById(`new-page-text-${ci}`).value.trim();
+            if (!text) { alert('Page text cannot be empty!'); return; }
+
+            const snap = await get(ref(db, `books/${currentEditorBookId}`));
+            const book = snap.val();
+            const pages    = book.pages    || [];
+            const chapters = book.chapters || [];
+            const ch       = chapters[ci];
+
+            // Insert page right after this chapter's last page
+            const insertAt = ch.endPage + 1;
+            pages.splice(insertAt, 0, text);
+
+            // Update chapter boundaries
+            chapters[ci].endPage += 1;
+            for (let i = ci + 1; i < chapters.length; i++) {
+                chapters[i].startPage += 1;
+                chapters[i].endPage   += 1;
+            }
+
+            await set(ref(db, `books/${currentEditorBookId}`), { ...book, pages, chapters });
+            closeAddPageForm(ci);
+            showSuccess('Page added! ✅');
+            reloadEditorBook();
+        }
+
+        async function deletePage(pageIndex) {
+            if (!confirm('Delete this page?')) return;
+            const { db, ref, get, set } = window.firebase;
+
+            const snap = await get(ref(db, `books/${currentEditorBookId}`));
+            const book = snap.val();
+            const pages    = book.pages    || [];
+            const chapters = book.chapters || [];
+
+            pages.splice(pageIndex, 1);
+
+            // Fix chapter boundaries
+            for (let i = 0; i < chapters.length; i++) {
+                const ch = chapters[i];
+                if (pageIndex < ch.startPage) {
+                    chapters[i].startPage -= 1;
+                    chapters[i].endPage   -= 1;
+                } else if (pageIndex <= ch.endPage) {
+                    chapters[i].endPage -= 1;
+                }
+            }
+
+            await set(ref(db, `books/${currentEditorBookId}`), { ...book, pages, chapters });
+            showSuccess('Page deleted!');
+            reloadEditorBook();
+        }
+
+        async function addChapterToBook() {
+            const title = document.getElementById('new-chapter-title').value.trim();
+            if (!title) { alert('Enter a chapter title'); return; }
+
+            const { db, ref, get, set } = window.firebase;
+            const snap = await get(ref(db, `books/${currentEditorBookId}`));
+            const book = snap.val();
+            const pages    = book.pages    || [];
+            const chapters = book.chapters || [];
+
+            // New chapter starts and ends at the current last page index
+            // (empty chapter — pages added after)
+            const startPage = pages.length;
+            chapters.push({ title, startPage, endPage: startPage - 1 });
+
+            await set(ref(db, `books/${currentEditorBookId}`), { ...book, chapters });
+            document.getElementById('new-chapter-title').value = '';
+            showSuccess(`Chapter "${title}" added!`);
+            reloadEditorBook();
+        }
+
+        async function deleteChapter(ci) {
+            if (!confirm('Delete this chapter AND all its pages?')) return;
+            const { db, ref, get, set } = window.firebase;
+
+            const snap = await get(ref(db, `books/${currentEditorBookId}`));
+            const book = snap.val();
+            const pages    = book.pages    || [];
+            const chapters = book.chapters || [];
+            const ch       = chapters[ci];
+
+            const removedCount = ch.endPage - ch.startPage + 1;
+            pages.splice(ch.startPage, removedCount > 0 ? removedCount : 0);
+            chapters.splice(ci, 1);
+
+            // Fix subsequent chapter boundaries
+            for (let i = ci; i < chapters.length; i++) {
+                chapters[i].startPage -= removedCount;
+                chapters[i].endPage   -= removedCount;
+            }
+
+            await set(ref(db, `books/${currentEditorBookId}`), { ...book, pages, chapters });
+            showSuccess('Chapter deleted!');
+            reloadEditorBook();
+        }
+
+        async function openEditChapterTitle(ci) {
+            const book = allBooks.find(b => b.id === currentEditorBookId);
+            const current = book?.chapters?.[ci]?.title || '';
+            const newTitle = prompt('Rename chapter:', current);
+            if (!newTitle || newTitle.trim() === current) return;
+
+            const { db, ref, set } = window.firebase;
+            await set(ref(db, `books/${currentEditorBookId}/chapters/${ci}/title`), newTitle.trim());
+            showSuccess('Chapter renamed!');
+            reloadEditorBook();
+        }
+
+        async function reloadEditorBook() {
+            const { db, ref, get } = window.firebase;
+            const snap = await get(ref(db, `books/${currentEditorBookId}`));
+            const book = { id: currentEditorBookId, ...snap.val() };
+            // Update in allBooks cache
+            const idx = allBooks.findIndex(b => b.id === currentEditorBookId);
+            if (idx >= 0) allBooks[idx] = book;
+            refreshEditorStats(book);
+            renderEditorChapters(book);
+            loadAdminData();
+        }
+
+        // ── Edit book info (title/author/cover) ──
         function editBook(id, title, author, coverUrl) {
             currentEditingBookId = id;
-            document.getElementById('book-step-1').style.display = 'block';
-            document.getElementById('book-step-2').style.display = 'none';
-            document.getElementById('book-title').value = title;
+            document.getElementById('book-title').value  = title;
             document.getElementById('book-author').value = author;
-            document.getElementById('book-cover').value = coverUrl;
+            document.getElementById('book-cover').value  = coverUrl;
 
-            const chaptersField = document.getElementById('book-chapters').parentElement;
-            chaptersField.style.display = 'none';
-
-            const nextBtn = document.querySelector('#book-step-1 .btn-primary');
-            nextBtn.textContent = '💾 Update Book Info';
-            nextBtn.onclick = updateBook;
+            const createBtn = document.querySelector('#book-create-form .btn-primary');
+            createBtn.textContent = '💾 Save Changes';
+            createBtn.onclick     = updateBook;
 
             let cancelBtn = document.getElementById('book-cancel-edit');
             if (!cancelBtn) {
                 cancelBtn = document.createElement('button');
                 cancelBtn.id = 'book-cancel-edit';
-                cancelBtn.textContent = '❌ Cancel Edit';
                 cancelBtn.style.cssText = 'width:100%;margin-top:10px;padding:12px;border-radius:12px;border:2px solid #ff4444;background:none;font-family:inherit;font-weight:700;cursor:pointer;color:#ff4444;';
-                cancelBtn.onclick = cancelBookEdit;
-                nextBtn.parentNode.appendChild(cancelBtn);
+                cancelBtn.textContent = '❌ Cancel Edit';
+                cancelBtn.onclick     = cancelBookEdit;
+                createBtn.parentNode.appendChild(cancelBtn);
             }
             cancelBtn.style.display = 'block';
-            document.querySelector('.admin-section').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('book-create-form').scrollIntoView({ behavior: 'smooth' });
         }
 
         async function updateBook() {
             if (!currentEditingBookId) return;
-            const title = document.getElementById('book-title').value.trim();
-            const author = document.getElementById('book-author').value.trim();
+            const title    = document.getElementById('book-title').value.trim();
+            const author   = document.getElementById('book-author').value.trim();
             const coverUrl = document.getElementById('book-cover').value.trim();
-            if (!title || !author || !coverUrl) { alert('Please fill all book fields!'); return; }
+            if (!title || !author || !coverUrl) { alert('Please fill all fields!'); return; }
 
             const { db, ref, update } = window.firebase;
-            try {
-                await update(ref(db, `books/${currentEditingBookId}`), { t: title, a: author, i: coverUrl });
-                showSuccess('Book updated successfully! ✅');
-                cancelBookEdit();
-                loadAdminData();
-            } catch (error) {
-                alert('Error updating book: ' + error.message);
-            }
+            await update(ref(db, `books/${currentEditingBookId}`), { t: title, a: author, i: coverUrl });
+            showSuccess('Book updated! ✅');
+            cancelBookEdit();
+            loadAdminData();
         }
 
         function cancelBookEdit() {
             currentEditingBookId = null;
-            document.getElementById('book-title').value = '';
+            document.getElementById('book-title').value  = '';
             document.getElementById('book-author').value = '';
-            document.getElementById('book-cover').value = '';
-            document.getElementById('book-chapters').parentElement.style.display = 'block';
-            const nextBtn = document.querySelector('#book-step-1 .btn-primary');
-            nextBtn.textContent = 'Next: Set Up Chapters →';
-            nextBtn.onclick = setupChapters;
+            document.getElementById('book-cover').value  = '';
+            const createBtn = document.querySelector('#book-create-form .btn-primary');
+            createBtn.textContent = '➕ Create Book';
+            createBtn.onclick     = createBookShell;
             const cancelBtn = document.getElementById('book-cancel-edit');
             if (cancelBtn) cancelBtn.style.display = 'none';
         }
 
         async function deleteBook(id) {
-            if (!confirm('⚠️ Delete this book? This cannot be undone!')) return;
+            if (!confirm('Delete this book and all its content?')) return;
             const { db, ref, remove } = window.firebase;
             await remove(ref(db, `books/${id}`));
+            if (currentEditorBookId === id) closeBookEditor();
             showSuccess('Book deleted! 🗑️');
             loadAdminData();
         }
 
+        // Legacy — keep so old calls don't break
+        function setupChapters() {}
+        function setupPages() {}
+        async function addBook() {}
+        function resetBookForm() {}
         async function deleteWord(type, id) {
             // Legacy wrapper - now handled by deleteSingleWord
             await deleteSingleWord(type, id, 'word');
