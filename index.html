@@ -276,8 +276,15 @@
 
         .nav-links {
             display: flex;
-            gap: 10px;
+            gap: 4px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            flex-shrink: 1;
+            min-width: 0;
         }
+        .nav-links::-webkit-scrollbar { display: none; }
 
         .nav-item {
             background: none;
@@ -292,7 +299,9 @@
             display: flex;
             align-items: center;
             gap: 5px;
-            padding: 8px;
+            padding: 8px 10px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .nav-item.active {
@@ -388,15 +397,49 @@
 
         .admin-section {
             margin-bottom: 30px;
-            padding: 25px;
+            padding: 0;
             background: var(--bg-page);
             border-radius: 20px;
+            overflow: hidden;
         }
 
-        .admin-section h3 {
-            margin: 0 0 15px 0;
-            font-size: 20px;
+        .admin-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 25px;
+            cursor: pointer;
+            user-select: none;
+            border-radius: 20px;
+            transition: background 0.2s;
+        }
+        .admin-section-header:hover { background: rgba(0,0,0,0.03); }
+
+        .admin-section-header h3 {
+            margin: 0;
+            font-size: 18px;
             font-weight: 800;
+        }
+
+        .admin-section-toggle {
+            font-size: 18px;
+            transition: transform 0.3s ease;
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+        .admin-section.collapsed .admin-section-toggle { transform: rotate(-90deg); }
+
+        .admin-section-body {
+            padding: 0 25px 25px;
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.3s ease;
+            max-height: 9999px;
+            opacity: 1;
+        }
+        .admin-section.collapsed .admin-section-body {
+            max-height: 0;
+            opacity: 0;
+            padding-bottom: 0;
         }
 
         .form-group {
@@ -1538,147 +1581,244 @@
             </div>
 
             <div id="admin-content" style="display: none;">
-                <!-- Books -->
-                <div class="admin-section">
-                    <h3>📚 Books</h3>
 
-                    <!-- Step 1: Create book shell -->
-                    <div id="book-create-form">
-                        <div class="form-group">
-                            <label>Book Title</label>
-                            <input type="text" id="book-title" placeholder="e.g., The Great Gatsby">
-                        </div>
-                        <div class="form-group">
-                            <label>Author</label>
-                            <input type="text" id="book-author" placeholder="e.g., F. Scott Fitzgerald">
-                        </div>
-                        <div class="form-group">
-                            <label>Cover Image URL</label>
-                            <input type="text" id="book-cover" placeholder="https://example.com/cover.jpg">
-                        </div>
-                        <button class="btn-primary" onclick="createBookShell()">➕ Create Book</button>
+                <!-- ── BOOKS ── -->
+                <div class="admin-section collapsed" id="as-books">
+                    <div class="admin-section-header" onclick="toggleAdminSection('as-books')">
+                        <h3>📚 Books</h3>
+                        <span class="admin-section-toggle">▼</span>
                     </div>
-
-                    <!-- Book list with inline chapter/page editor -->
-                    <div class="item-list" id="book-list-admin"></div>
+                    <div class="admin-section-body">
+                        <div id="book-create-form">
+                            <div class="form-group">
+                                <label>Book Title</label>
+                                <input type="text" id="book-title" placeholder="e.g., The Great Gatsby">
+                            </div>
+                            <div class="form-group">
+                                <label>Author</label>
+                                <input type="text" id="book-author" placeholder="e.g., F. Scott Fitzgerald">
+                            </div>
+                            <div class="form-group">
+                                <label>Cover Image URL</label>
+                                <input type="text" id="book-cover" placeholder="https://example.com/cover.jpg">
+                            </div>
+                            <button class="btn-primary" onclick="createBookShell()">➕ Create Book</button>
+                        </div>
+                        <div class="item-list" id="book-list-admin"></div>
+                    </div>
                 </div>
 
-                <!-- Chapter/Page editor panel (slides in) -->
+                <!-- Chapter/Page editor panel -->
                 <div id="book-editor-panel" style="display:none;" class="admin-section">
-                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-                        <button onclick="closeBookEditor()" style="background:rgba(0,0,0,0.06);border:none;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">←</button>
-                        <div>
-                            <div id="editor-book-title" style="font-weight:800;font-size:18px;"></div>
-                            <div id="editor-book-stats" style="font-size:12px;color:#888;"></div>
+                    <div class="admin-section-body" style="padding-top:20px;">
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+                            <button onclick="closeBookEditor()" style="background:rgba(0,0,0,0.06);border:none;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">←</button>
+                            <div>
+                                <div id="editor-book-title" style="font-weight:800;font-size:18px;"></div>
+                                <div id="editor-book-stats" style="font-size:12px;color:#888;"></div>
+                            </div>
                         </div>
-                    </div>
-
-                    <!-- Existing chapters list -->
-                    <div id="editor-chapters-list"></div>
-
-                    <!-- Add new chapter -->
-                    <div style="background:white;border-radius:15px;padding:18px;margin-top:16px;">
-                        <div style="font-weight:800;font-size:15px;margin-bottom:12px;">➕ Add New Chapter</div>
-                        <div class="form-group">
-                            <label>Chapter Title</label>
-                            <input type="text" id="new-chapter-title" placeholder="e.g., Chapter 1: The Beginning">
+                        <div id="editor-chapters-list"></div>
+                        <div style="background:white;border-radius:15px;padding:18px;margin-top:16px;">
+                            <div style="font-weight:800;font-size:15px;margin-bottom:12px;">➕ Add New Chapter</div>
+                            <div class="form-group">
+                                <label>Chapter Title</label>
+                                <input type="text" id="new-chapter-title" placeholder="e.g., Chapter 1: The Beginning">
+                            </div>
+                            <button class="btn-primary" onclick="addChapterToBook()">Add Chapter</button>
                         </div>
-                        <button class="btn-primary" onclick="addChapterToBook()">Add Chapter</button>
                     </div>
                 </div>
 
-                <!-- SAT Words with Folders -->
-                <div class="admin-section">
-                    <h3>📖 SAT Vocabulary - Direct Database Storage</h3>
-                    <p style="background: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 10px; font-size: 13px; margin-bottom: 15px;">
-                        ✅ Words are stored <strong>directly in Firebase database</strong> - no file uploads needed!
-                    </p>
-
-                    <div class="form-group">
-                        <label>Create New Folder</label>
-                        <input type="text" id="sat-folder-name" placeholder="e.g., Essential 500 Words">
+                <!-- ── SAT VOCAB ── -->
+                <div class="admin-section collapsed" id="as-sat-vocab">
+                    <div class="admin-section-header" onclick="toggleAdminSection('as-sat-vocab')">
+                        <h3>📖 SAT Vocabulary</h3>
+                        <span class="admin-section-toggle">▼</span>
                     </div>
-                    <button class="btn-primary" onclick="createSATFolder()" style="margin-bottom: 20px;">➕ Create Folder</button>
-
-                    <!-- ✅ FIXED: unique ID for admin panel folder list -->
-                    <div id="admin-sat-folders-list" style="margin-bottom: 20px;"></div>
-
-                    <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
-                        <h4 style="margin: 0 0 15px 0; font-size: 16px; font-weight: 800;">Add New Word</h4>
+                    <div class="admin-section-body">
                         <div class="form-group">
-                            <label>Select Folder</label>
-                            <select id="sat-folder-select" style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 12px; font-family: inherit; font-size: 14px; background: white;">
-                                <option value="">Loading folders...</option>
-                            </select>
+                            <label>Create New Folder</label>
+                            <input type="text" id="sat-folder-name" placeholder="e.g., Essential 500 Words">
                         </div>
-                        <div class="form-group">
-                            <label>Word</label>
-                            <input type="text" id="sat-word" placeholder="e.g., Benevolent">
+                        <button class="btn-primary" onclick="createSATFolder()" style="margin-bottom: 20px;">➕ Create Folder</button>
+                        <div id="admin-sat-folders-list" style="margin-bottom: 20px;"></div>
+                        <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
+                            <h4 style="margin: 0 0 15px 0; font-size: 16px; font-weight: 800;">Add New Word</h4>
+                            <div class="form-group">
+                                <label>Select Folder</label>
+                                <select id="sat-folder-select" style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 12px; font-family: inherit; font-size: 14px; background: white;">
+                                    <option value="">Loading folders...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Word</label>
+                                <input type="text" id="sat-word" placeholder="e.g., Benevolent">
+                            </div>
+                            <div class="form-group">
+                                <label>Definition</label>
+                                <textarea id="sat-def" placeholder="e.g., Well meaning and kindly"></textarea>
+                            </div>
+                            <button class="btn-primary" id="sat-add-btn" onclick="addSATWord()">Add SAT Word</button>
+                            <button id="sat-cancel-edit" onclick="cancelEdit('sat')" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:2px solid #ff4444;background:none;font-family:inherit;font-weight:700;cursor:pointer;color:#ff4444;display:none;">Cancel Edit</button>
                         </div>
-                        <div class="form-group">
-                            <label>Definition</label>
-                            <textarea id="sat-def" placeholder="e.g., Well meaning and kindly"></textarea>
-                        </div>
-                        <button class="btn-primary" id="sat-add-btn" onclick="addSATWord()">Add SAT Word</button>
-                        <button id="sat-cancel-edit" onclick="cancelEdit('sat')" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:2px solid #ff4444;background:none;font-family:inherit;font-weight:700;cursor:pointer;color:#ff4444;display:none;">Cancel Edit</button>
+                        <div class="item-list" id="sat-word-list"></div>
                     </div>
-
-                    <div class="item-list" id="sat-word-list"></div>
                 </div>
 
-                <!-- IELTS Words with Folders -->
-                <div class="admin-section">
-                    <h3>🎓 IELTS Vocabulary - Direct Database Storage</h3>
-                    <p style="background: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 10px; font-size: 13px; margin-bottom: 15px;">
-                        ✅ Words are stored <strong>directly in Firebase database</strong> - no file uploads needed!
-                    </p>
-
-                    <div class="form-group">
-                        <label>Create New Folder</label>
-                        <input type="text" id="ielts-folder-name" placeholder="e.g., Academic Writing Words">
+                <!-- ── SAT RULES ── -->
+                <div class="admin-section collapsed" id="as-sat-rules">
+                    <div class="admin-section-header" onclick="toggleAdminSection('as-sat-rules')">
+                        <h3>📐 SAT Rules</h3>
+                        <span class="admin-section-toggle">▼</span>
                     </div>
-                    <button class="btn-primary" onclick="createIELTSFolder()" style="margin-bottom: 20px;">➕ Create Folder</button>
-
-                    <!-- ✅ FIXED: unique ID for admin panel folder list -->
-                    <div id="admin-ielts-folders-list" style="margin-bottom: 20px;"></div>
-
-                    <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
-                        <h4 style="margin: 0 0 15px 0; font-size: 16px; font-weight: 800;">Add New Word</h4>
+                    <div class="admin-section-body">
                         <div class="form-group">
-                            <label>Select Folder</label>
-                            <select id="ielts-folder-select" style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 12px; font-family: inherit; font-size: 14px; background: white;">
-                                <option value="">Loading folders...</option>
-                            </select>
+                            <label>Create New Folder</label>
+                            <input type="text" id="sat-rules-folder-name" placeholder="e.g., Grammar Rules">
                         </div>
-                        <div class="form-group">
-                            <label>Word</label>
-                            <input type="text" id="ielts-word" placeholder="e.g., Coherent">
+                        <button class="btn-primary" onclick="createContentFolder('sat-rules')" style="margin-bottom:20px;">➕ Create Folder</button>
+                        <div id="admin-sat-rules-folders-list" style="margin-bottom:20px;"></div>
+                        <div style="background:white;padding:20px;border-radius:15px;margin-top:20px;">
+                            <h4 style="margin:0 0 15px 0;font-size:16px;font-weight:800;">Add Rule</h4>
+                            <div class="form-group">
+                                <label>Select Folder</label>
+                                <select id="sat-rules-folder-select" style="width:100%;padding:12px;border:2px solid rgba(0,0,0,0.1);border-radius:12px;font-family:inherit;font-size:14px;background:white;">
+                                    <option value="">Select folder...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Title</label>
+                                <input type="text" id="sat-rules-title" placeholder="e.g., Subject-Verb Agreement">
+                            </div>
+                            <div class="form-group">
+                                <label>Content</label>
+                                <textarea id="sat-rules-content" placeholder="Explain the rule here..." style="min-height:120px;"></textarea>
+                            </div>
+                            <button class="btn-primary" onclick="addContentItem('sat-rules')">Add Rule</button>
                         </div>
-                        <div class="form-group">
-                            <label>Definition</label>
-                            <textarea id="ielts-def" placeholder="e.g., Logical and consistent"></textarea>
-                        </div>
-                        <button class="btn-primary" id="ielts-add-btn" onclick="addIELTSWord()">Add IELTS Word</button>
-                        <button id="ielts-cancel-edit" onclick="cancelEdit('ielts')" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:2px solid #ff4444;background:none;font-family:inherit;font-weight:700;cursor:pointer;color:#ff4444;display:none;">Cancel Edit</button>
+                        <div class="item-list" id="sat-rules-item-list"></div>
                     </div>
-
-                    <div class="item-list" id="ielts-word-list"></div>
                 </div>
 
-                <!-- Podcasts -->
-                <div class="admin-section">
-                    <h3>🎧 Add Podcast/Audio</h3>
-                    <div class="form-group">
-                        <label>Title</label>
-                        <input type="text" id="podcast-title" placeholder="e.g., Romeo and Juliet">
+                <!-- ── SAT HACKS ── -->
+                <div class="admin-section collapsed" id="as-sat-hacks">
+                    <div class="admin-section-header" onclick="toggleAdminSection('as-sat-hacks')">
+                        <h3>⚡ SAT Hacks</h3>
+                        <span class="admin-section-toggle">▼</span>
                     </div>
-                    <div class="form-group">
-                        <label>YouTube URL</label>
-                        <input type="text" id="podcast-url" placeholder="https://youtu.be/...">
+                    <div class="admin-section-body">
+                        <div class="form-group">
+                            <label>Create New Folder</label>
+                            <input type="text" id="sat-hacks-folder-name" placeholder="e.g., Math Shortcuts">
+                        </div>
+                        <button class="btn-primary" onclick="createContentFolder('sat-hacks')" style="margin-bottom:20px;">➕ Create Folder</button>
+                        <div id="admin-sat-hacks-folders-list" style="margin-bottom:20px;"></div>
+                        <div style="background:white;padding:20px;border-radius:15px;margin-top:20px;">
+                            <h4 style="margin:0 0 15px 0;font-size:16px;font-weight:800;">Add Hack</h4>
+                            <div class="form-group">
+                                <label>Select Folder</label>
+                                <select id="sat-hacks-folder-select" style="width:100%;padding:12px;border:2px solid rgba(0,0,0,0.1);border-radius:12px;font-family:inherit;font-size:14px;background:white;">
+                                    <option value="">Select folder...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Title</label>
+                                <input type="text" id="sat-hacks-title" placeholder="e.g., Eliminate Wrong Answers First">
+                            </div>
+                            <div class="form-group">
+                                <label>Content</label>
+                                <textarea id="sat-hacks-content" placeholder="Describe the hack..." style="min-height:120px;"></textarea>
+                            </div>
+                            <button class="btn-primary" onclick="addContentItem('sat-hacks')">Add Hack</button>
+                        </div>
+                        <div class="item-list" id="sat-hacks-item-list"></div>
                     </div>
-                    <button class="btn-primary" onclick="addPodcast()">Add Podcast</button>
-                    <div class="item-list" id="podcast-list-admin"></div>
                 </div>
+
+                <!-- ── SAT PRACTICE TESTS ── -->
+                <div class="admin-section collapsed" id="as-sat-practice">
+                    <div class="admin-section-header" onclick="toggleAdminSection('as-sat-practice')">
+                        <h3>📝 SAT Practice Tests</h3>
+                        <span class="admin-section-toggle">▼</span>
+                    </div>
+                    <div class="admin-section-body">
+                        <div style="background:white;padding:20px;border-radius:15px;">
+                            <h4 style="margin:0 0 15px 0;font-size:16px;font-weight:800;">Add Practice Test Link</h4>
+                            <div class="form-group">
+                                <label>Test Name</label>
+                                <input type="text" id="sat-practice-title" placeholder="e.g., Official SAT Practice Test 1">
+                            </div>
+                            <div class="form-group">
+                                <label>URL</label>
+                                <input type="text" id="sat-practice-url" placeholder="https://...">
+                            </div>
+                            <div class="form-group">
+                                <label>Description (optional)</label>
+                                <input type="text" id="sat-practice-desc" placeholder="e.g., 98 questions, full length">
+                            </div>
+                            <button class="btn-primary" onclick="addPracticeTest()">Add Test</button>
+                        </div>
+                        <div class="item-list" id="sat-practice-item-list"></div>
+                    </div>
+                </div>
+
+                <!-- ── IELTS VOCAB ── -->
+                <div class="admin-section collapsed" id="as-ielts-vocab">
+                    <div class="admin-section-header" onclick="toggleAdminSection('as-ielts-vocab')">
+                        <h3>🎓 IELTS Vocabulary</h3>
+                        <span class="admin-section-toggle">▼</span>
+                    </div>
+                    <div class="admin-section-body">
+                        <div class="form-group">
+                            <label>Create New Folder</label>
+                            <input type="text" id="ielts-folder-name" placeholder="e.g., Academic Writing Words">
+                        </div>
+                        <button class="btn-primary" onclick="createIELTSFolder()" style="margin-bottom: 20px;">➕ Create Folder</button>
+                        <div id="admin-ielts-folders-list" style="margin-bottom: 20px;"></div>
+                        <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
+                            <h4 style="margin: 0 0 15px 0; font-size: 16px; font-weight: 800;">Add New Word</h4>
+                            <div class="form-group">
+                                <label>Select Folder</label>
+                                <select id="ielts-folder-select" style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 12px; font-family: inherit; font-size: 14px; background: white;">
+                                    <option value="">Loading folders...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Word</label>
+                                <input type="text" id="ielts-word" placeholder="e.g., Coherent">
+                            </div>
+                            <div class="form-group">
+                                <label>Definition</label>
+                                <textarea id="ielts-def" placeholder="e.g., Logical and consistent"></textarea>
+                            </div>
+                            <button class="btn-primary" id="ielts-add-btn" onclick="addIELTSWord()">Add IELTS Word</button>
+                            <button id="ielts-cancel-edit" onclick="cancelEdit('ielts')" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:2px solid #ff4444;background:none;font-family:inherit;font-weight:700;cursor:pointer;color:#ff4444;display:none;">Cancel Edit</button>
+                        </div>
+                        <div class="item-list" id="ielts-word-list"></div>
+                    </div>
+                </div>
+
+                <!-- ── PODCASTS ── -->
+                <div class="admin-section collapsed" id="as-podcasts">
+                    <div class="admin-section-header" onclick="toggleAdminSection('as-podcasts')">
+                        <h3>🎧 Podcasts / Audio</h3>
+                        <span class="admin-section-toggle">▼</span>
+                    </div>
+                    <div class="admin-section-body">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" id="podcast-title" placeholder="e.g., Romeo and Juliet">
+                        </div>
+                        <div class="form-group">
+                            <label>YouTube URL</label>
+                            <input type="text" id="podcast-url" placeholder="https://youtu.be/...">
+                        </div>
+                        <button class="btn-primary" onclick="addPodcast()">Add Podcast</button>
+                        <div class="item-list" id="podcast-list-admin"></div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -1765,10 +1905,8 @@
             <div id="edu-rules-sat" class="edu-section">
                 <button class="back-btn-edu" onclick="openEduLevel('edu-sat')">← Назад</button>
                 <div class="label">SAT Rules</div>
-                <div class="sub-card" style="text-align:center;padding:60px 30px;">
-                    <div style="font-size:48px;margin-bottom:20px;">📐</div>
-                    <h3 style="margin:0 0 10px 0;font-size:22px;">Coming Soon!</h3>
-                    <p style="margin:0;color:#888;font-size:15px;line-height:1.6;">Grammar and math rules will be added here.</p>
+                <div id="edu-rules-sat-content" class="edu-cards-container">
+                    <div class="sub-card" style="text-align:center;padding:40px;color:#aaa;">Loading...</div>
                 </div>
             </div>
 
@@ -1776,10 +1914,8 @@
             <div id="edu-hacks-sat" class="edu-section">
                 <button class="back-btn-edu" onclick="openEduLevel('edu-sat')">← Назад</button>
                 <div class="label">SAT Hacks</div>
-                <div class="sub-card" style="text-align:center;padding:60px 30px;">
-                    <div style="font-size:48px;margin-bottom:20px;">⚡</div>
-                    <h3 style="margin:0 0 10px 0;font-size:22px;">Coming Soon!</h3>
-                    <p style="margin:0;color:#888;font-size:15px;line-height:1.6;">Tips, tricks and shortcuts will be added here.</p>
+                <div id="edu-hacks-sat-content" class="edu-cards-container">
+                    <div class="sub-card" style="text-align:center;padding:40px;color:#aaa;">Loading...</div>
                 </div>
             </div>
 
@@ -1787,10 +1923,8 @@
             <div id="edu-practice-sat" class="edu-section">
                 <button class="back-btn-edu" onclick="openEduLevel('edu-sat')">← Назад</button>
                 <div class="label">Practice Tests</div>
-                <div class="sub-card" style="text-align:center;padding:60px 30px;">
-                    <div style="font-size:48px;margin-bottom:20px;">📝</div>
-                    <h3 style="margin:0 0 10px 0;font-size:22px;">Coming Soon!</h3>
-                    <p style="margin:0;color:#888;font-size:15px;line-height:1.6;">Full-length SAT practice tests will be added here.</p>
+                <div id="edu-practice-sat-content" class="edu-cards-container">
+                    <div class="sub-card" style="text-align:center;padding:40px;color:#aaa;">Loading...</div>
                 </div>
             </div>
 
@@ -2035,6 +2169,13 @@
             const podcastsSnap = await get(ref(db, 'podcasts'));
             const podcasts = podcastsSnap.val() ? Object.keys(podcastsSnap.val()).map(k => ({id: k, ...podcastsSnap.val()[k]})) : [];
             displayAdminPodcasts(podcasts);
+
+            // Load new content sections
+            await loadContentFolders('sat-rules');
+            await loadContentFolders('sat-hacks');
+            await loadContentItems('sat-rules');
+            await loadContentItems('sat-hacks');
+            await loadPracticeTests();
         }
 
         function displayAdminBooks(books) {
@@ -2628,6 +2769,169 @@
             loadAdminData();
         }
 
+        // ===== COLLAPSIBLE ADMIN SECTIONS =====
+        function toggleAdminSection(id) {
+            const el = document.getElementById(id);
+            el.classList.toggle('collapsed');
+        }
+
+        // ===== GENERIC CONTENT SYSTEM (Rules / Hacks) =====
+        // type = 'sat-rules' | 'sat-hacks'
+
+        async function createContentFolder(type) {
+            const input = document.getElementById(`${type}-folder-name`);
+            const name  = input.value.trim();
+            if (!name) { alert('Enter a folder name'); return; }
+            const { db, ref, push, set } = window.firebase;
+            const r = push(ref(db, `${type}-folders`));
+            await set(r, { name, createdAt: Date.now() });
+            input.value = '';
+            showSuccess(`Folder "${name}" created!`);
+            loadContentFolders(type);
+        }
+
+        async function loadContentFolders(type) {
+            const { db, ref, get } = window.firebase;
+            const snap = await get(ref(db, `${type}-folders`));
+            const folders = snap.val()
+                ? Object.keys(snap.val()).map(k => ({ id: k, ...snap.val()[k] }))
+                : [];
+
+            const select = document.getElementById(`${type}-folder-select`);
+            if (select) {
+                select.innerHTML = folders.length
+                    ? folders.map(f => `<option value="${f.id}">${f.name}</option>`).join('')
+                    : '<option value="">No folders yet</option>';
+            }
+
+            const listEl = document.getElementById(`admin-${type}-folders-list`);
+            if (listEl) {
+                listEl.innerHTML = folders.length ? `
+                    <div style="background:white;padding:12px 15px;border-radius:12px;">
+                        <strong style="font-size:13px;">Folders:</strong>
+                        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;">
+                            ${folders.map(f => `
+                                <div style="background:var(--accent);color:white;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;">
+                                    📁 ${f.name}
+                                    <button onclick="deleteContentFolder('${type}','${f.id}')" style="background:rgba(255,255,255,0.3);border:none;color:white;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:13px;line-height:1;padding:0;">×</button>
+                                </div>`).join('')}
+                        </div>
+                    </div>` : '';
+            }
+        }
+
+        async function deleteContentFolder(type, folderId) {
+            if (!confirm('Delete this folder? Items inside will remain.')) return;
+            const { db, ref, remove } = window.firebase;
+            await remove(ref(db, `${type}-folders/${folderId}`));
+            showSuccess('Folder deleted!');
+            loadContentFolders(type);
+        }
+
+        async function addContentItem(type) {
+            const folderId = document.getElementById(`${type}-folder-select`).value;
+            const title    = document.getElementById(`${type}-title`).value.trim();
+            const body     = document.getElementById(`${type}-content`).value.trim();
+            if (!folderId || !title || !body) { alert('Fill in all fields and select a folder'); return; }
+
+            const { db, ref, push, set, get } = window.firebase;
+            const fSnap = await get(ref(db, `${type}-folders/${folderId}`));
+            const folderName = fSnap.val()?.name || '';
+
+            const r = push(ref(db, `${type}-items`));
+            await set(r, { title, body, folder: folderId, folderName });
+
+            document.getElementById(`${type}-title`).value   = '';
+            document.getElementById(`${type}-content`).value = '';
+            showSuccess(`Added to "${folderName}"!`);
+            loadContentItems(type);
+        }
+
+        async function loadContentItems(type) {
+            const { db, ref, get } = window.firebase;
+            const snap  = await get(ref(db, `${type}-items`));
+            const items = snap.val()
+                ? Object.keys(snap.val()).map(k => ({ id: k, ...snap.val()[k] }))
+                : [];
+
+            const listEl = document.getElementById(`${type}-item-list`);
+            if (!listEl) return;
+            if (items.length === 0) {
+                listEl.innerHTML = '<p style="color:#aaa;text-align:center;padding:16px;">No items yet</p>';
+                return;
+            }
+
+            const grouped = {};
+            items.forEach(it => {
+                const fn = it.folderName || 'Uncategorized';
+                if (!grouped[fn]) grouped[fn] = [];
+                grouped[fn].push(it);
+            });
+
+            listEl.innerHTML = Object.entries(grouped).map(([fn, its]) => `
+                <div style="margin-top:16px;">
+                    <div style="background:var(--accent);color:white;padding:8px 14px;border-radius:10px;font-weight:800;font-size:13px;margin-bottom:8px;">📁 ${fn}</div>
+                    ${its.map(it => `
+                        <div class="item-entry">
+                            <div class="item-info">
+                                <div class="item-title">${it.title}</div>
+                                <div class="item-detail">${it.body.substring(0,80)}${it.body.length>80?'…':''}</div>
+                            </div>
+                            <button class="btn-delete" onclick="deleteContentItem('${type}','${it.id}')">🗑️</button>
+                        </div>`).join('')}
+                </div>`).join('');
+        }
+
+        async function deleteContentItem(type, id) {
+            const { db, ref, remove } = window.firebase;
+            await remove(ref(db, `${type}-items/${id}`));
+            showSuccess('Deleted!');
+            loadContentItems(type);
+        }
+
+        // ===== PRACTICE TESTS =====
+        async function addPracticeTest() {
+            const title = document.getElementById('sat-practice-title').value.trim();
+            const url   = document.getElementById('sat-practice-url').value.trim();
+            const desc  = document.getElementById('sat-practice-desc').value.trim();
+            if (!title || !url) { alert('Title and URL are required'); return; }
+            const { db, ref, push, set } = window.firebase;
+            const r = push(ref(db, 'sat-practice-tests'));
+            await set(r, { title, url, desc });
+            document.getElementById('sat-practice-title').value = '';
+            document.getElementById('sat-practice-url').value   = '';
+            document.getElementById('sat-practice-desc').value  = '';
+            showSuccess('Practice test added!');
+            loadPracticeTests();
+        }
+
+        async function loadPracticeTests() {
+            const { db, ref, get } = window.firebase;
+            const snap  = await get(ref(db, 'sat-practice-tests'));
+            const tests = snap.val()
+                ? Object.keys(snap.val()).map(k => ({ id: k, ...snap.val()[k] }))
+                : [];
+            const listEl = document.getElementById('sat-practice-item-list');
+            if (!listEl) return;
+            listEl.innerHTML = tests.length
+                ? tests.map(t => `
+                    <div class="item-entry">
+                        <div class="item-info">
+                            <div class="item-title">${t.title}</div>
+                            <div class="item-detail">${t.desc || t.url}</div>
+                        </div>
+                        <button class="btn-delete" onclick="deletePracticeTest('${t.id}')">🗑️</button>
+                    </div>`).join('')
+                : '<p style="color:#aaa;text-align:center;padding:16px;">No tests yet</p>';
+        }
+
+        async function deletePracticeTest(id) {
+            const { db, ref, remove } = window.firebase;
+            await remove(ref(db, `sat-practice-tests/${id}`));
+            showSuccess('Deleted!');
+            loadPracticeTests();
+        }
+
         function showSuccess(message) {
             const existing = document.querySelector('.success-message');
             if (existing) existing.remove();
@@ -2987,6 +3291,68 @@
             });
         }
 
+        function loadContentRealtime() {
+            const { db, ref, onValue } = window.firebase;
+
+            const renderContentItems = (containerId, items) => {
+                const el = document.getElementById(containerId);
+                if (!el) return;
+                if (items.length === 0) {
+                    el.innerHTML = '<div class="sub-card" style="text-align:center;padding:40px;color:#aaa;">Nothing here yet!</div>';
+                    return;
+                }
+                const grouped = {};
+                items.forEach(it => {
+                    const fn = it.folderName || 'General';
+                    if (!grouped[fn]) grouped[fn] = [];
+                    grouped[fn].push(it);
+                });
+                el.innerHTML = Object.entries(grouped).map(([fn, its]) => `
+                    <div style="margin-bottom:20px;">
+                        <div style="font-size:13px;font-weight:800;color:var(--accent);margin:0 0 10px 5px;text-transform:uppercase;letter-spacing:0.5px;">📁 ${fn}</div>
+                        ${its.map(it => `
+                            <div class="vocab-item" style="margin-bottom:10px;">
+                                <div class="v-word">${it.title}</div>
+                                <div class="v-def">${it.body}</div>
+                            </div>`).join('')}
+                    </div>`).join('');
+            };
+
+            onValue(ref(db, 'sat-rules-items'), (snap) => {
+                const data = snap.val();
+                const items = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : [];
+                renderContentItems('edu-rules-sat-content', items);
+            }, () => {});
+
+            onValue(ref(db, 'sat-hacks-items'), (snap) => {
+                const data = snap.val();
+                const items = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : [];
+                renderContentItems('edu-hacks-sat-content', items);
+            }, () => {});
+
+            onValue(ref(db, 'sat-practice-tests'), (snap) => {
+                const data = snap.val();
+                const tests = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : [];
+                const el = document.getElementById('edu-practice-sat-content');
+                if (!el) return;
+                if (tests.length === 0) {
+                    el.innerHTML = '<div class="sub-card" style="text-align:center;padding:40px;color:#aaa;">No practice tests yet!</div>';
+                    return;
+                }
+                el.innerHTML = tests.map(t => `
+                    <a href="${t.url}" target="_blank" style="text-decoration:none;">
+                        <div class="edu-card">
+                            <div>
+                                <div class="edu-title" style="font-size:18px;">${t.title}</div>
+                                ${t.desc ? `<div style="font-size:13px;color:#888;margin-top:6px;">${t.desc}</div>` : ''}
+                            </div>
+                            <div class="edu-icon">🔗</div>
+                        </div>
+                    </a>`).join('');
+            }, () => {});
+        }
+
+
         function renderVocabList(vocabType) {
             const containerId = vocabType === 'sat' ? 'edu-sat-folders-list' : 'edu-ielts-folders-list';
             const container = document.getElementById(containerId);
@@ -3200,6 +3566,7 @@
 
             // Start vocab listeners immediately — all data already has folder fields
             loadVocabRealtime();
+            loadContentRealtime();
         }
 
         // ===== DUOCARDS ENGINE =====
